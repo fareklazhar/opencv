@@ -7,10 +7,8 @@ import sys, os, re
 def remove_comments(s):
     def replacer(match):
         s = match.group(0)
-        if s.startswith('/'):
-            return ""
-        else:
-            return s
+        return "" if s.startswith('/') else s
+
     pattern = re.compile(
         r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
         re.DOTALL | re.MULTILINE
@@ -28,7 +26,7 @@ def getParameter(pos, tokens):
     while True:
         if pos >= len(tokens):
             break
-        if (tokens[pos] == ')' or tokens[pos] == ',') and deep == 0:
+        if tokens[pos] in [')', ','] and deep == 0:
             if tokens[pos] == ')':
                 pos = len(tokens)
             else:
@@ -59,7 +57,7 @@ def getParameters(i, tokens):
             assert False
             break
 
-    if len(params) > 0 and params[0] == 'void':
+    if params and params[0] == 'void':
         del params[0]
 
     return params

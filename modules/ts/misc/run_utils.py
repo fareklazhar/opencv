@@ -39,23 +39,19 @@ def execute(cmd, silent = False, cwd = "."):
 
 def isColorEnabled(args):
     usercolor = [a for a in args if a.startswith("--gtest_color=")]
-    return len(usercolor) == 0 and sys.stdout.isatty() and hostos != "nt"
+    return not usercolor and sys.stdout.isatty() and hostos != "nt"
 
 #===================================================================================================
 
 def getPlatformVersion():
     mv = platform.mac_ver()
     if mv[0]:
-        return "Darwin" + mv[0]
-    else:
-        wv = platform.win32_ver()
-        if wv[0]:
-            return "Windows" + wv[0]
-        else:
-            lv = platform.linux_distribution()
-            if lv[0]:
-                return lv[0] + lv[1]
-    return None
+        return f"Darwin{mv[0]}"
+    wv = platform.win32_ver()
+    if wv[0]:
+        return f"Windows{wv[0]}"
+    lv = platform.linux_distribution()
+    return lv[0] + lv[1] if lv[0] else None
 
 def readGitVersion(git, path):
     if not path or not git or not os.path.isdir(os.path.join(path, ".git")):
@@ -126,20 +122,19 @@ def testSIMD(compiler, cxx_flags, compiler_arg = None):
         for opt in " ".join(cxx_flags).split():
             if opt.count('\"') % 2 == 1:
                 if prev_option is None:
-                     prev_option = opt
+                    prev_option = opt
                 else:
-                     options.append(prev_option + " " + opt)
-                     prev_option = None
+                    options.append(f"{prev_option} {opt}")
+                    prev_option = None
             elif prev_option is None:
                 options.append(opt)
             else:
-                prev_option = prev_option + " " + opt
+                prev_option = f"{prev_option} {opt}"
         options.append(tmpfile)
         compiler_output = execute(options, silent = True)
         os.remove(tmpfile)
-        m = re.search("#error\W+(\w+)", compiler_output)
-        if m:
-            return m.group(1)
+        if m := re.search("#error\W+(\w+)", compiler_output):
+            return m[1]
     except OSError:
         pass
     log.debug("SIMD detection failed")
@@ -190,21 +185,19 @@ class CMakeCache:
         rx = re.compile(r'^opencv_(\w+)_SOURCE_DIR:STATIC=(.*)$')
         module_paths = {} # name -> path
         with open(fname, "rt") as cachefile:
-            for l in cachefile.readlines():
+            for l in cachefile:
                 ll = l.strip()
                 if not ll or ll.startswith("#"):
                     continue
                 for p in parse_patterns:
-                    match = p["pattern"].match(ll)
-                    if match:
+                    if match := p["pattern"].match(ll):
                         value = match.groups()[0]
                         if value and not value.endswith("-NOTFOUND"):
                             setattr(self, p["name"], value)
                             # log.debug("cache value: %s = %s", p["name"], value)
 
-                match = rx.search(ll)
-                if match:
-                    module_paths[match.group(1)] = match.group(2)
+                if match := rx.search(ll):
+                    module_paths[match[1]] = match[2]
 
         if not self.tests_dir:
             self.tests_dir = path
@@ -225,7 +218,7 @@ class CMakeCache:
 
         for module,path in module_paths.items():
             rel = os.path.relpath(path, self.opencv_home)
-            if not ".." in rel:
+            if ".." not in rel:
                 self.main_modules.append(module)
 
         self.flags = [
@@ -245,7 +238,7 @@ class CMakeCache:
         if self.tests_dir and os.path.isdir(self.tests_dir):
             d = os.path.abspath(self.tests_dir)
             files = glob.glob(os.path.join(d, mask))
-            if not self.getOS() == "android" and self.withJava():
+            if self.getOS() != "android" and self.withJava():
                 files.append("java")
             return [f for f in files if isGood(f)]
         return []
@@ -261,19 +254,16 @@ class CMakeCache:
 
     def getGitVersion(self):
         if self.cmake_home_vcver:
-            if self.cmake_home_vcver == self.opencv_home_vcver:
+            if (
+                self.cmake_home_vcver == self.opencv_home_vcver
+                or not self.opencv_home_vcver
+            ):
                 rev = self.cmake_home_vcver
-            elif self.opencv_home_vcver:
-                rev = self.cmake_home_vcver + "-" + self.opencv_home_vcver
             else:
-                rev = self.cmake_home_vcver
+                rev = f"{self.cmake_home_vcver}-{self.opencv_home_vcver}"
         else:
             rev = None
-        if rev:
-            rev = rev.replace(":","to")
-        else:
-            rev = ""
-        return rev
+        return rev.replace(":","to") if rev else ""
 
     def getTestFullName(self, shortname):
         return os.path.join(self.tests_dir, shortname)
@@ -282,10 +272,7 @@ class CMakeCache:
         return self.featuresSIMD
 
     def getOS(self):
-        if self.android_executable:
-            return "android"
-        else:
-            return hostos
+        return "android" if self.android_executable else hostos
 
     def getArch(self):
         arch = "unknown"
@@ -379,8 +366,8 @@ def getRunningProcessExePathByName_win32(name):
     ret = Process32First( hProcessSnap , pointer( pe32 ) )
     path = None
 
-    while ret :
-        if name + ".exe" == pe32.szExeFile:
+    while ret:
+        if f"{name}.exe" == pe32.szExeFile:
             hModuleSnap = c_void_p(0)
             me32 = MODULEENTRY32()
             me32.dwSize = sizeof( MODULEENTRY32 )

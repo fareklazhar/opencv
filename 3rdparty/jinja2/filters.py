@@ -93,8 +93,9 @@ def do_urlencode(value):
             pass
     if itemiter is None:
         return unicode_urlencode(value)
-    return u'&'.join(unicode_urlencode(k) + '=' +
-                     unicode_urlencode(v) for k, v in itemiter)
+    return u'&'.join(
+        f'{unicode_urlencode(k)}={unicode_urlencode(v)}' for k, v in itemiter
+    )
 
 
 @evalcontextfilter
@@ -160,12 +161,12 @@ def do_xmlattr(_eval_ctx, d, autospace=True):
     if the filter returned something unless the second parameter is false.
     """
     rv = u' '.join(
-        u'%s="%s"' % (escape(key), escape(value))
+        f'{escape(key)}="{escape(value)}"'
         for key, value in iteritems(d)
         if value is not None and not isinstance(value, Undefined)
     )
     if autospace and rv:
-        rv = u' ' + rv
+        rv = f' {rv}'
     if _eval_ctx.autoescape:
         rv = Markup(rv)
     return rv
@@ -182,11 +183,11 @@ def do_title(s):
     """Return a titlecased version of the value. I.e. words will start with
     uppercase letters, all remaining characters are lowercase.
     """
-    rv = []
-    for item in re.compile(r'([-\s]+)(?u)').split(s):
-        if not item:
-            continue
-        rv.append(item[0].upper() + item[1:].lower())
+    rv = [
+        item[0].upper() + item[1:].lower()
+        for item in re.compile(r'([-\s]+)(?u)').split(s)
+        if item
+    ]
     return ''.join(rv)
 
 
@@ -327,10 +328,7 @@ def do_join(eval_ctx, value, d=u'', attribute=None):
                 do_escape = True
             else:
                 value[idx] = text_type(item)
-        if do_escape:
-            d = escape(d)
-        else:
-            d = text_type(d)
+        d = escape(d) if do_escape else text_type(d)
         return d.join(value)
 
     # no html involved, to normal joining
@@ -376,7 +374,7 @@ def do_filesizeformat(value, binary=False):
     prefixes are used (Mebi, Gibi).
     """
     bytes = float(value)
-    base = binary and 1024 or 1000
+    base = 1024 if binary else 1000
     prefixes = [
         (binary and 'KiB' or 'kB'),
         (binary and 'MiB' or 'MB'),
@@ -651,7 +649,7 @@ def do_round(value, precision=0, method='common'):
         {{ 42.55|round|int }}
             -> 43
     """
-    if not method in ('common', 'ceil', 'floor'):
+    if method not in ('common', 'ceil', 'floor'):
         raise FilterArgumentError('method must be common, ceil or floor')
     if method == 'common':
         return round(value, precision)

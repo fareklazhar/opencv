@@ -32,10 +32,10 @@ class TestTickets(unittest.TestCase):
         defects = cv.ConvexityDefects(pts, hull, storage)
 
         vis = cv.CreateImage((1000,1000), 8, 3)
-        x0 = min([x for (x,y) in xys]) - 10
-        x1 = max([x for (x,y) in xys]) + 10
-        y0 = min([y for (y,y) in xys]) - 10
-        y1 = max([y for (y,y) in xys]) + 10
+        x0 = min(x for (x,y) in xys) - 10
+        x1 = max(x for (x,y) in xys) + 10
+        y0 = min(y for (y,y) in xys) - 10
+        y1 = max(y for (y,y) in xys) + 10
         def xform(pt):
             x,y = pt
             return (1000 * (x - x0) / (x1 - x0),
@@ -84,8 +84,8 @@ if __name__ == '__main__':
     random.seed(0)
     if len(sys.argv) == 1:
         suite = unittest.TestLoader().loadTestsFromTestCase(TestTickets)
-        unittest.TextTestRunner(verbosity=2).run(suite)
     else:
         suite = unittest.TestSuite()
         suite.addTest(TestTickets(sys.argv[1]))
-        unittest.TextTestRunner(verbosity=2).run(suite)
+
+    unittest.TextTestRunner(verbosity=2).run(suite)

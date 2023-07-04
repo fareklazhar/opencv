@@ -6,7 +6,7 @@ import os
 
 
 architecture = 'armeabi'
-excludedHeaders = set(['hdf5.h', 'cap_ios.h', 'ios.h', 'eigen.hpp', 'cxeigen.hpp']) #TOREMOVE
+excludedHeaders = {'hdf5.h', 'cap_ios.h', 'ios.h', 'eigen.hpp', 'cxeigen.hpp'}
 systemIncludes = ['sources/cxx-stl/gnu-libstdc++/4.6/include', \
     '/opt/android-ndk-r8c/platforms/android-8/arch-arm', # TODO: check if this one could be passed as command line arg
     'sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi-v7a/include']
@@ -19,20 +19,21 @@ excludedOptionsPrefix = '-W'
 
 
 def GetHeaderFiles(root):
-    headers = []
-    for path in os.listdir(root):
-        if not os.path.isdir(os.path.join(root, path)) \
-            and os.path.splitext(path)[1] in ['.h', '.hpp'] \
-            and not path in excludedHeaders:
-            headers.append(os.path.join(root, path))
+    headers = [
+        os.path.join(root, path)
+        for path in os.listdir(root)
+        if not os.path.isdir(os.path.join(root, path))
+        and os.path.splitext(path)[1] in ['.h', '.hpp']
+        and path not in excludedHeaders
+    ]
     return sorted(headers)
 
 
 
 def GetClasses(root, prefix):
     classes = []
-    if ('' != prefix):
-        prefix = prefix + '.'
+    if prefix != '':
+        prefix = f'{prefix}.'
     for path in os.listdir(root):
         currentPath = os.path.join(root, path)
         if (os.path.isdir(currentPath)):
@@ -67,13 +68,12 @@ def GetJavaHHeaders():
         quit()
 
     for currentClass in allJavaClasses:
-        os.system('javah -d %s -classpath %s:%s %s' % (javahHeaders, classPath, \
-            AndroidJavaDeps, currentClass))
+        os.system(
+            f'javah -d {javahHeaders} -classpath {classPath}:{AndroidJavaDeps} {currentClass}'
+        )
 
     print('Building JNI headers list ...')
-    jniHeaders = GetHeaderFiles(javahHeaders)
-
-    return jniHeaders
+    return GetHeaderFiles(javahHeaders)
 
 
 
@@ -89,7 +89,7 @@ def GetOpenCVModules():
     left = makefileStr.find('OPENCV_MODULES:=') + len('OPENCV_MODULES:=')
     right = makefileStr[left:].find('\n')
     modules = makefileStr[left:left+right].split()
-    modules = filter(lambda x: x != 'ts' and x != 'androidcamera', modules)
+    modules = filter(lambda x: x not in ['ts', 'androidcamera'], modules)
     return modules
 
 
@@ -132,10 +132,10 @@ def FindHeaders(includeJni):
 
 
 def FindLibraries():
-    libraries = []
-    for lib in targetLibs:
-        libraries.append(os.path.join(managerDir, 'sdk/native/libs', architecture, lib))
-    return libraries
+    return [
+        os.path.join(managerDir, 'sdk/native/libs', architecture, lib)
+        for lib in targetLibs
+    ]
 
 
 
@@ -144,9 +144,7 @@ def FindIncludes():
         os.path.join(managerDir, 'sdk', 'native', 'jni', 'include', 'opencv'),
         os.path.join(managerDir, 'sdk', 'native', 'jni', 'include', 'opencv2')]
 
-    for inc in systemIncludes:
-        includes.append(os.path.join(NDK_path, inc))
-
+    includes.extend(os.path.join(NDK_path, inc) for inc in systemIncludes)
     return includes
 
 

@@ -12,6 +12,7 @@
     :copyright: (c) 2010 by the Jinja Team.
     :license: BSD.
 """
+
 import operator
 from jinja2.environment import Environment
 from jinja2.exceptions import SecurityError
@@ -23,14 +24,19 @@ from jinja2._compat import string_types, function_type, method_type, \
 MAX_RANGE = 100000
 
 #: attributes of function objects that are considered unsafe.
-UNSAFE_FUNCTION_ATTRIBUTES = set(['func_closure', 'func_code', 'func_dict',
-                                  'func_defaults', 'func_globals'])
+UNSAFE_FUNCTION_ATTRIBUTES = {
+    'func_closure',
+    'func_code',
+    'func_dict',
+    'func_defaults',
+    'func_globals',
+}
 
 #: unsafe method attributes.  function attributes are unsafe for methods too
-UNSAFE_METHOD_ATTRIBUTES = set(['im_class', 'im_func', 'im_self'])
+UNSAFE_METHOD_ATTRIBUTES = {'im_class', 'im_func', 'im_self'}
 
 #: unsafe generator attirbutes.
-UNSAFE_GENERATOR_ATTRIBUTES = set(['gi_frame', 'gi_code'])
+UNSAFE_GENERATOR_ATTRIBUTES = {'gi_frame', 'gi_code'}
 
 # On versions > python 2 the special attributes on functions are gone,
 # but they remain on methods and generators for whatever reason.
@@ -171,10 +177,14 @@ def modifies_known_mutable(obj, attr):
     >>> modifies_known_mutable("foo", "upper")
     False
     """
-    for typespec, unsafe in _mutable_spec:
-        if isinstance(obj, typespec):
-            return attr in unsafe
-    return False
+    return next(
+        (
+            attr in unsafe
+            for typespec, unsafe in _mutable_spec
+            if isinstance(obj, typespec)
+        ),
+        False,
+    )
 
 
 class SandboxedEnvironment(Environment):

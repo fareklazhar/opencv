@@ -18,7 +18,7 @@ class TestGoodFeaturesToTrack(unittest.TestCase):
         self.assert_(arr.tostring() == original.tostring())
 
         # Check for repeatability
-        for i in range(10):
+        for _ in range(10):
             results2 = dict([(t, cv.GoodFeaturesToTrack(arr, eig_image, temp_image, 20000, t, 2, useHarris = 1)) for t in threshes])
             self.assert_(results == results2)
 

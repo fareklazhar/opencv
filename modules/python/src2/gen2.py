@@ -261,10 +261,12 @@ class ClassInfo(object):
         if decl:
             bases = decl[1].split()[1:]
             if len(bases) > 1:
-                print("Note: Class %s has more than 1 base class (not supported by Python C extensions)" % (self.name,))
+                print(
+                    f"Note: Class {self.name} has more than 1 base class (not supported by Python C extensions)"
+                )
                 print("      Bases: ", " ".join(bases))
                 print("      Only the first base class will be used")
-                #return sys.exit(-1)
+                        #return sys.exit(-1)
             elif len(bases) == 1:
                 self.base = bases[0].strip(",")
                 if self.base.startswith("cv::"):
@@ -305,10 +307,7 @@ class ClassInfo(object):
         sorted_props = [(p.name, p) for p in self.props]
         sorted_props.sort()
 
-        access_op = "->"
-        if self.issimple:
-            access_op = "."
-
+        access_op = "." if self.issimple else "->"
         for pname, p in sorted_props:
             if self.isalgorithm:
                 getset_code.write(gen_template_get_prop_algo.substitute(name=self.name, cname=self.cname, member=pname, membertype=p.tp, access=access_op))
@@ -326,23 +325,26 @@ class ClassInfo(object):
         methods_code = StringIO()
         methods_inits = StringIO()
 
-        sorted_methods = list(self.methods.items())
-        sorted_methods.sort()
-
+        sorted_methods = sorted(self.methods.items())
         for mname, m in sorted_methods:
             methods_code.write(m.gen_code(all_classes))
             methods_inits.write(m.get_tab_entry())
 
         baseptr = "NULL"
         if self.base and self.base in all_classes:
-            baseptr = "&pyopencv_" + all_classes[self.base].name + "_Type"
+            baseptr = f"&pyopencv_{all_classes[self.base].name}_Type"
 
-        code = gen_template_type_impl.substitute(name=self.name, wname=self.wname, cname=self.cname,
-            getset_code=getset_code.getvalue(), getset_inits=getset_inits.getvalue(),
-            methods_code=methods_code.getvalue(), methods_inits=methods_inits.getvalue(),
-            baseptr=baseptr, extra_specials="")
-
-        return code
+        return gen_template_type_impl.substitute(
+            name=self.name,
+            wname=self.wname,
+            cname=self.cname,
+            getset_code=getset_code.getvalue(),
+            getset_inits=getset_inits.getvalue(),
+            methods_code=methods_code.getvalue(),
+            methods_inits=methods_inits.getvalue(),
+            baseptr=baseptr,
+            extra_specials="",
+        )
 
 
 def handle_ptr(tp):
@@ -381,7 +383,7 @@ class ArgInfo(object):
         self.py_outputarg = False
 
     def isbig(self):
-        return self.tp == "Mat" or self.tp == "vector_Mat"# or self.tp.startswith("vector")
+        return self.tp in ["Mat", "vector_Mat"]
 
     def crepr(self):
         return "ArgInfo(\"%s\", %d)" % (self.name, self.outputarg)
@@ -402,8 +404,7 @@ class FuncVariant(object):
             ainfo = ArgInfo(a)
             if ainfo.isarray and not ainfo.arraycvt:
                 c = ainfo.arraylen
-                c_arrlist = self.array_counters.get(c, [])
-                if c_arrlist:
+                if c_arrlist := self.array_counters.get(c, []):
                     c_arrlist.append(ainfo.name)
                 else:
                     self.array_counters[c] = [ainfo.name]
@@ -446,17 +447,14 @@ class FuncVariant(object):
                 continue
             if not a.inputarg:
                 continue
-            if not a.defval:
-                arglist.append((a.name, argno))
-            else:
+            if a.defval:
                 firstoptarg = min(firstoptarg, len(arglist))
                 # if there are some array output parameters before the first default parameter, they
                 # are added as optional parameters before the first optional parameter
                 if outarr_list:
                     arglist += outarr_list
                     outarr_list = []
-                arglist.append((a.name, argno))
-
+            arglist.append((a.name, argno))
         if outarr_list:
             firstoptarg = min(firstoptarg, len(arglist))
             arglist += outarr_list
@@ -470,19 +468,19 @@ class FuncVariant(object):
         if self.rettype:
             outlist = [("retval", -1)] + outlist
         elif self.isconstructor:
-            assert outlist == []
+            assert not outlist
             outlist = [("self", -1)]
         if self.isconstructor:
             classname = self.classname
             if classname.startswith("Cv"):
                 classname=classname[2:]
-            outstr = "<%s object>" % (classname,)
+            outstr = f"<{classname} object>"
         elif outlist:
             outstr = ", ".join([o[0] for o in outlist])
         else:
             outstr = "None"
 
-        self.py_docstring = "%s(%s) -> %s" % (self.wname, argstr, outstr)
+        self.py_docstring = f"{self.wname}({argstr}) -> {outstr}"
         self.py_noptargs = noptargs
         self.py_arglist = arglist
         for aname, argno in arglist:
@@ -508,7 +506,7 @@ class FuncInfo(object):
     def get_wrapper_name(self):
         name = self.name
         if self.classname:
-            classname = self.classname + "_"
+            classname = f"{self.classname}_"
             if "[" in name:
                 name = "getelem"
         else:
@@ -517,11 +515,8 @@ class FuncInfo(object):
 
     def get_wrapper_prototype(self):
         full_fname = self.get_wrapper_name()
-        if self.classname and not self.isconstructor:
-            self_arg = "self"
-        else:
-            self_arg = ""
-        return "static PyObject* %s(PyObject* %s, PyObject* args, PyObject* kw)" % (full_fname, self_arg)
+        self_arg = "self" if self.classname and not self.isconstructor else ""
+        return f"static PyObject* {full_fname}(PyObject* {self_arg}, PyObject* args, PyObject* kw)"
 
     def get_tab_entry(self):
         docstring_list = []
@@ -541,7 +536,7 @@ class FuncInfo(object):
             s = self.variants[idx].py_docstring
             p1 = s.find("(")
             p2 = s.rfind(")")
-            docstring_list = [s[:p1+1] + "[" + s[p1+1:p2] + "]" + s[p2:]]
+            docstring_list = [f"{s[:p1 + 1]}[{s[p1 + 1:p2]}]{s[p2:]}"]
 
         return Template('    {"$py_funcname", (PyCFunction)$wrap_funcname, METH_VARARGS | METH_KEYWORDS, "$py_docstring"},\n'
                         ).substitute(py_funcname = self.variants[0].wname, wrap_funcname=self.get_wrapper_name(),

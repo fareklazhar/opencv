@@ -100,8 +100,6 @@ def is_undefined(obj):
 
 def consume(iterable):
     """Consumes an iterable without doing anything with it."""
-    for event in iterable:
-        pass
 
 
 def clear_caches():
@@ -166,8 +164,8 @@ def object_type_repr(obj):
     if obj.__class__.__module__ in ('__builtin__', 'builtins'):
         name = obj.__class__.__name__
     else:
-        name = obj.__class__.__module__ + '.' + obj.__class__.__name__
-    return '%s object' % name
+        name = f'{obj.__class__.__module__}.{obj.__class__.__name__}'
+    return f'{name} object'
 
 
 def pformat(obj, verbose=False):
@@ -198,10 +196,9 @@ def urlize(text, trim_url_limit=None, nofollow=False):
                          and (x[:limit] + (len(x) >=limit and '...'
                          or '')) or x
     words = _word_split_re.split(text_type(escape(text)))
-    nofollow_attr = nofollow and ' rel="nofollow"' or ''
+    nofollow_attr = ' rel="nofollow"' if nofollow else ''
     for i, word in enumerate(words):
-        match = _punctuation_re.match(word)
-        if match:
+        if match := _punctuation_re.match(word):
             lead, middle, trail = match.groups()
             if middle.startswith('www.') or (
                 '@' not in middle and
@@ -213,15 +210,17 @@ def urlize(text, trim_url_limit=None, nofollow=False):
                     middle.endswith('.net') or
                     middle.endswith('.com')
                 )):
-                middle = '<a href="http://%s"%s>%s</a>' % (middle,
-                    nofollow_attr, trim_url(middle))
+                middle = f'<a href="http://{middle}"{nofollow_attr}>{trim_url(middle)}</a>'
             if middle.startswith('http://') or \
                middle.startswith('https://'):
-                middle = '<a href="%s"%s>%s</a>' % (middle,
-                    nofollow_attr, trim_url(middle))
-            if '@' in middle and not middle.startswith('www.') and \
-               not ':' in middle and _simple_email_re.match(middle):
-                middle = '<a href="mailto:%s">%s</a>' % (middle, middle)
+                middle = f'<a href="{middle}"{nofollow_attr}>{trim_url(middle)}</a>'
+            if (
+                '@' in middle
+                and not middle.startswith('www.')
+                and ':' not in middle
+                and _simple_email_re.match(middle)
+            ):
+                middle = f'<a href="mailto:{middle}">{middle}</a>'
             if lead + middle + trail != word:
                 words[i] = lead + middle + trail
     return u''.join(words)
@@ -266,14 +265,14 @@ def generate_lorem_ipsum(n=5, html=True, min=20, max=100):
         # ensure that the paragraph ends with a dot.
         p = u' '.join(p)
         if p.endswith(','):
-            p = p[:-1] + '.'
+            p = f'{p[:-1]}.'
         elif not p.endswith('.'):
             p += '.'
         result.append(p)
 
     if not html:
         return u'\n\n'.join(result)
-    return Markup(u'\n'.join(u'<p>%s</p>' % escape(x) for x in result))
+    return Markup(u'\n'.join(f'<p>{escape(x)}</p>' for x in result))
 
 
 def unicode_urlencode(obj, charset='utf-8'):
@@ -346,11 +345,10 @@ class LRUCache(object):
         """
         self._wlock.acquire()
         try:
-            try:
-                return self[key]
-            except KeyError:
-                self[key] = default
-                return default
+            return self[key]
+        except KeyError:
+            self[key] = default
+            return default
         finally:
             self._wlock.release()
 
@@ -497,9 +495,8 @@ class Cycler(object):
 
     def __next__(self):
         """Goes one item ahead and returns it."""
-        rv = self.current
         self.pos = (self.pos + 1) % len(self.items)
-        return rv
+        return self.current
 
 
 class Joiner(object):
