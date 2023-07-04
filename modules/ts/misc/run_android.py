@@ -5,7 +5,7 @@ from run_utils import *
 from run_suite import TestSuite
 
 def exe(program):
-    return program + ".exe" if hostos == 'nt' else program
+    return f"{program}.exe" if hostos == 'nt' else program
 
 class ApkInfo:
     def __init__(self):
@@ -74,8 +74,9 @@ class Adb(Tool):
         return "Android" + self.run(["shell", "getprop ro.build.version.release"], silent = True).strip()
 
     def getHardware(self):
-        hw = re.search(r"^Hardware[ \t]*:[ \t]*(.*?)$", self.cpuinfo, re.MULTILINE)
-        if hw:
+        if hw := re.search(
+            r"^Hardware[ \t]*:[ \t]*(.*?)$", self.cpuinfo, re.MULTILINE
+        ):
             return hw.group(1).strip()
 
     def checkArmHardware(self, expected_abi):
@@ -92,14 +93,17 @@ class Aapt(Tool):
     def __init__(self, sdk_dir):
         Tool.__init__(self)
         aapt_fn = exe("aapt")
-        aapt = None
-        for r, ds, fs in os.walk( os.path.join(sdk_dir, 'build-tools') ):
-            if aapt_fn in fs:
-                aapt = os.path.join(r, aapt_fn)
-                break
-        if not aapt:
+        if aapt := next(
+            (
+                os.path.join(r, aapt_fn)
+                for r, ds, fs in os.walk(os.path.join(sdk_dir, 'build-tools'))
+                if aapt_fn in fs
+            ),
+            None,
+        ):
+            self.cmd = [aapt]
+        else:
             raise Err("Can not find aapt tool: %s", aapt_fn)
-        self.cmd = [aapt]
 
     def dump(self, exe):
         res = ApkInfo()
@@ -164,9 +168,13 @@ class AndroidTestSuite(TestSuite):
             if not (output and "Success" in output):
                 raise Err("Can not install package: %s", exe)
 
-            params = ["-e package %s" % info.pkg_target]
-            ret = self.adb.run(["shell", "am instrument -w %s %s/%s" % (" ".join(params), info.pkg_name, info.pkg_runner)])
-            return None, ret
+            params = [f"-e package {info.pkg_target}"]
+            ret = self.adb.run(
+                [
+                    "shell",
+                    f'am instrument -w {" ".join(params)} {info.pkg_name}/{info.pkg_runner}',
+                ]
+            )
         else:
             device_dir = getpass.getuser().replace(" ","") + "_" + self.options.mode +"/"
             if isColorEnabled(args):
@@ -176,20 +184,21 @@ class AndroidTestSuite(TestSuite):
             exename = os.path.basename(exe)
             android_exe = android_dir + exename
             self.adb.run(["push", exe, android_exe])
-            self.adb.run(["shell", "chmod 777 " + android_exe])
-            env_pieces = ["export %s=%s" % (a,b) for a,b in self.env.items()]
-            pieces = ["cd %s" % android_dir, "./%s %s" % (exename, " ".join(args))]
-            log.warning("Run: %s" % " && ".join(pieces))
+            self.adb.run(["shell", f"chmod 777 {android_exe}"])
+            env_pieces = [f"export {a}={b}" for a,b in self.env.items()]
+            pieces = [f"cd {android_dir}", f'./{exename} {" ".join(args)}']
+            log.warning(f'Run: {" && ".join(pieces)}')
             ret = self.adb.run(["shell", " && ".join(env_pieces + pieces)])
             # try get log
             hostlogpath = os.path.join(workingDir, logfile)
             self.adb.run(["pull", android_dir + logfile, hostlogpath])
             # cleanup
-            self.adb.run(["shell", "rm " + android_dir + logfile])
-            self.adb.run(["shell", "rm " + tempdir + "__opencv_temp.*"], silent = True)
+            self.adb.run(["shell", f"rm {android_dir}{logfile}"])
+            self.adb.run(["shell", f"rm {tempdir}__opencv_temp.*"], silent = True)
             if os.path.isfile(hostlogpath):
                 return hostlogpath, ret
-            return None, ret
+
+        return None, ret
 
 #===================================================================================================
 

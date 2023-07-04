@@ -31,15 +31,15 @@ class NewOpenCVTests(unittest.TestCase):
     repoUrl = 'https://raw.github.com/Itseez/opencv/master'
 
     def get_sample(self, filename, iscolor = cv2.IMREAD_COLOR):
-        if not filename in self.image_cache:
+        if filename not in self.image_cache:
             filedata = None
             if NewOpenCVTests.repoPath is not None:
-                candidate = NewOpenCVTests.repoPath + '/' + filename
+                candidate = f'{NewOpenCVTests.repoPath}/{filename}'
                 if os.path.isfile(candidate):
                     with open(candidate, 'rb') as f:
                         filedata = f.read()
             if filedata is None:
-                filedata = urlopen(NewOpenCVTests.repoUrl + '/' + filename).read()
+                filedata = urlopen(f'{NewOpenCVTests.repoUrl}/{filename}').read()
             self.image_cache[filename] = cv2.imdecode(np.fromstring(filedata, dtype=np.uint8), iscolor)
         return self.image_cache[filename]
 
@@ -53,15 +53,15 @@ class NewOpenCVTests(unittest.TestCase):
     if sys.version_info[:2] == (2, 6):
         def assertLess(self, a, b, msg=None):
             if not a < b:
-                self.fail('%s not less than %s' % (repr(a), repr(b)))
+                self.fail(f'{repr(a)} not less than {repr(b)}')
 
         def assertLessEqual(self, a, b, msg=None):
             if not a <= b:
-                self.fail('%s not less than or equal to %s' % (repr(a), repr(b)))
+                self.fail(f'{repr(a)} not less than or equal to {repr(b)}')
 
         def assertGreater(self, a, b, msg=None):
             if not a > b:
-                self.fail('%s not greater than %s' % (repr(a), repr(b)))
+                self.fail(f'{repr(a)} not greater than {repr(b)}')
 
 # Tests to run first; check the handful of basic operations that the later tests rely on
 

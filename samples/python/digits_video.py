@@ -25,7 +25,7 @@ def main():
 
     classifier_fn = 'digits_svm.dat'
     if not os.path.exists(classifier_fn):
-        print('"%s" not found, run digits.py first' % classifier_fn)
+        print(f'"{classifier_fn}" not found, run digits.py first')
         return
     model = SVM()
     model.load(classifier_fn)

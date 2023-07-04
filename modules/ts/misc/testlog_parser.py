@@ -94,11 +94,11 @@ class TestInfo(object):
         if name in ["gmean", "min", "mean", "median", "stddev"]:
             scale = 1.0
             frequency = self.metrix.get("frequency", 1.0) or 1.0
-            if units == "ms":
-                scale = 1000.0
             if units == "mks":
                 scale = 1000000.0
-            if units == "ns":
+            elif units == "ms":
+                scale = 1000.0
+            elif units == "ns":
                 scale = 1000000000.0
             if units == "ticks":
                 frequency = long(1)
@@ -113,9 +113,7 @@ class TestInfo(object):
 
     def getName(self):
         pos = self.name.find("/")
-        if pos > 0:
-            return self.name[:pos]
-        return self.name
+        return self.name[:pos] if pos > 0 else self.name
 
 
     def getFixture(self):
@@ -148,15 +146,13 @@ class TestInfo(object):
         if r != 0:
             return r
         if self.type_param:
-            if other.type_param:
-                r = cmp(self.type_param, other.type_param);
-                if r != 0:
-                     return r
-            else:
+            if not other.type_param:
                 return -1
-        else:
-            if other.type_param:
-                return 1
+            r = cmp(self.type_param, other.type_param);
+            if r != 0:
+                 return r
+        elif other.type_param:
+            return 1
         if self.value_param:
             if other.value_param:
                 r = cmp(self.value_param, other.value_param);
@@ -164,9 +160,8 @@ class TestInfo(object):
                      return r
             else:
                 return -1
-        else:
-            if other.value_param:
-                return 1
+        elif other.value_param:
+            return 1
         return 0
 
 # This is a Sequence for compatibility with old scripts,

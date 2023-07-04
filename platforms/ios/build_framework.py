@@ -30,16 +30,15 @@ import glob, re, os, os.path, shutil, string, sys, argparse, traceback
 from subprocess import check_call, check_output, CalledProcessError
 
 def execute(cmd, cwd = None):
-    print("Executing: %s in %s" % (cmd, cwd), file=sys.stderr)
+    print(f"Executing: {cmd} in {cwd}", file=sys.stderr)
     retcode = check_call(cmd, cwd = cwd)
     if retcode != 0:
         raise Exception("Child returned:", retcode)
 
 def getXCodeMajor():
     ret = check_output(["xcodebuild", "-version"])
-    m = re.match(r'XCode\s+(\d)\..*', ret, flags=re.IGNORECASE)
-    if m:
-        return int(m.group(1))
+    if m := re.match(r'XCode\s+(\d)\..*', ret, flags=re.IGNORECASE):
+        return int(m[1])
     return 0
 
 class Builder:
@@ -74,10 +73,14 @@ class Builder:
             dirs.append(mainBD)
             cmake_flags = []
             if self.contrib:
-                cmake_flags.append("-DOPENCV_EXTRA_MODULES_PATH=%s" % self.contrib)
+                cmake_flags.append(f"-DOPENCV_EXTRA_MODULES_PATH={self.contrib}")
             if xcode_ver >= 7 and t[1] == 'iPhoneOS':
-                cmake_flags.append("-DCMAKE_C_FLAGS=-fembed-bitcode")
-                cmake_flags.append("-DCMAKE_CXX_FLAGS=-fembed-bitcode")
+                cmake_flags.extend(
+                    (
+                        "-DCMAKE_C_FLAGS=-fembed-bitcode",
+                        "-DCMAKE_CXX_FLAGS=-fembed-bitcode",
+                    )
+                )
             self.buildOne(t[0], t[1], mainBD, cmake_flags)
             self.mergeLibs(mainBD)
         self.makeFramework(outdir, dirs)
@@ -87,36 +90,43 @@ class Builder:
             self._build(outdir)
         except Exception as e:
             print("="*60, file=sys.stderr)
-            print("ERROR: %s" % e, file=sys.stderr)
+            print(f"ERROR: {e}", file=sys.stderr)
             print("="*60, file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             sys.exit(1)
 
     def getToolchain(self, arch, target):
-        toolchain = os.path.join(self.opencv, "platforms", "ios", "cmake", "Toolchains", "Toolchain-%s_Xcode.cmake" % target)
-        return toolchain
+        return os.path.join(
+            self.opencv,
+            "platforms",
+            "ios",
+            "cmake",
+            "Toolchains",
+            f"Toolchain-{target}_Xcode.cmake",
+        )
 
     def getCMakeArgs(self, arch, target):
-        args = [
+        return [
             "cmake",
             "-GXcode",
             "-DAPPLE_FRAMEWORK=ON",
             "-DCMAKE_INSTALL_PREFIX=install",
             "-DCMAKE_BUILD_TYPE=Release",
         ]
-        return args
 
     def getBuildCommand(self, arch, target):
-        buildcmd = [
+        return [
             "xcodebuild",
             "IPHONEOS_DEPLOYMENT_TARGET=6.0",
-            "ARCHS=%s" % arch,
-            "-sdk", target.lower(),
-            "-configuration", "Release",
+            f"ARCHS={arch}",
+            "-sdk",
+            target.lower(),
+            "-configuration",
+            "Release",
             "-parallelizeTargets",
-            "-jobs", "4"
+            "-jobs",
+            "4",
         ]
-        return buildcmd
 
     def getInfoPlist(self, builddirs):
         return os.path.join(builddirs[0], "ios", "Info.plist")
@@ -124,8 +134,11 @@ class Builder:
     def buildOne(self, arch, target, builddir, cmakeargs = []):
         # Run cmake
         toolchain = self.getToolchain(arch, target)
-        cmakecmd = self.getCMakeArgs(arch, target) + \
-            (["-DCMAKE_TOOLCHAIN_FILE=%s" % toolchain] if toolchain is not None else [])
+        cmakecmd = self.getCMakeArgs(arch, target) + (
+            [f"-DCMAKE_TOOLCHAIN_FILE={toolchain}"]
+            if toolchain is not None
+            else []
+        )
         if arch.startswith("armv") or arch.startswith("arm64"):
             cmakecmd.append("-DENABLE_NEON=ON")
         cmakecmd.append(self.opencv)
@@ -151,7 +164,7 @@ class Builder:
         libname = "libopencv_merged.a"
 
         # set the current dir to the dst root
-        framework_dir = os.path.join(outdir, "%s.framework" % name)
+        framework_dir = os.path.join(outdir, f"{name}.framework")
         if os.path.isdir(framework_dir):
             shutil.rmtree(framework_dir)
         os.makedirs(framework_dir)
@@ -163,9 +176,7 @@ class Builder:
 
         # make universal static lib
         libs = [os.path.join(d, "lib", "Release", libname) for d in builddirs]
-        lipocmd = ["lipo", "-create"]
-        lipocmd.extend(libs)
-        lipocmd.extend(["-o", os.path.join(dstdir, name)])
+        lipocmd = ["lipo", "-create", *libs, *["-o", os.path.join(dstdir, name)]]
         print("Creating universal library from:\n\t%s" % "\n\t".join(libs), file=sys.stderr)
         execute(lipocmd)
 

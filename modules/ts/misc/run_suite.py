@@ -7,8 +7,8 @@ class TestSuite(object):
     def __init__(self, options, cache):
         self.options = options
         self.cache = cache
-        self.nameprefix = "opencv_" + self.options.mode + "_"
-        self.tests = self.cache.gatherTests(self.nameprefix + "*", self.isTest)
+        self.nameprefix = f"opencv_{self.options.mode}_"
+        self.tests = self.cache.gatherTests(f"{self.nameprefix}*", self.isTest)
 
     def getOS(self):
         return getPlatformVersion() or self.cache.getOS()
@@ -33,7 +33,7 @@ class TestSuite(object):
             lname = "_".join([p for p in pieces if p])
             lname = re.sub(r'[\(\)\[\]\s,]', '_', lname)
             l = re.sub(r'_+', '_', lname)
-        return l + ".xml"
+        return f"{l}.xml"
 
     def listTests(self, short = False, main = False):
         if len(self.tests) == 0:
@@ -79,10 +79,12 @@ class TestSuite(object):
         raise Err("Can not find test: %s", name)
 
     def getTestList(self, white, black):
-        res = [t for t in white or self.tests if self.getAlias(t) not in black]
-        if len(res) == 0:
+        if res := [
+            t for t in white or self.tests if self.getAlias(t) not in black
+        ]:
+            return set(res)
+        else:
             raise Err("No tests found")
-        return set(res)
 
     def isTest(self, fullpath):
         if fullpath == "java":
@@ -97,7 +99,7 @@ class TestSuite(object):
         if self.options.valgrind:
             res = ['valgrind']
             if self.options.valgrind_supp:
-                res.append("--suppressions=%s" % self.options.valgrind_supp)
+                res.append(f"--suppressions={self.options.valgrind_supp}")
             res.extend(self.options.valgrind_opt)
             return res + cmd
         return cmd
@@ -106,22 +108,26 @@ class TestSuite(object):
         args = args[:]
         exe = os.path.abspath(path)
         if path == "java":
-            cmd = [self.cache.ant_executable, "-Dopencv.build.type=%s" % self.cache.build_type, "buildAndTest"]
-            ret = execute(cmd, cwd = self.cache.java_test_binary_dir + "/.build")
-            return None, ret
+            cmd = [
+                self.cache.ant_executable,
+                f"-Dopencv.build.type={self.cache.build_type}",
+                "buildAndTest",
+            ]
+            ret = execute(cmd, cwd=f"{self.cache.java_test_binary_dir}/.build")
         else:
             if isColorEnabled(args):
                 args.append("--gtest_color=yes")
             cmd = self.wrapInValgrind([exe] + args)
             tempDir = TempEnvDir('OPENCV_TEMP_PATH', "__opencv_temp.")
             tempDir.init()
-            log.warning("Run: %s" % " ".join(cmd))
+            log.warning(f'Run: {" ".join(cmd)}')
             ret = execute(cmd, cwd = workingDir)
             tempDir.clean()
             hostlogpath = os.path.join(workingDir, logfile)
             if os.path.isfile(hostlogpath):
                 return hostlogpath, ret
-            return None, ret
+
+        return None, ret
 
     def checkPrerequisites(self):
         if self.cache.getArch() == "x64" and hostmachine == "x86":
@@ -140,13 +146,12 @@ class TestSuite(object):
             more_args = []
             exe = self.getTest(test)
 
-            userlog = [a for a in args if a.startswith("--gtest_output=")]
-            if len(userlog) == 0:
-                logname = self.getLogName(exe, date)
-                more_args.append("--gtest_output=xml:" + logname)
-            else:
+            if userlog := [a for a in args if a.startswith("--gtest_output=")]:
                 logname = userlog[0][userlog[0].find(":")+1:]
 
+            else:
+                logname = self.getLogName(exe, date)
+                more_args.append(f"--gtest_output=xml:{logname}")
             log.debug("Running the test: %s (%s) ==> %s in %s", exe, args + more_args, logname, workingDir)
             if self.options.dry_run:
                 logfile, r = None, 0

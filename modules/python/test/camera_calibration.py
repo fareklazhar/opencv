@@ -13,7 +13,7 @@ def clamp(a, x, b):
     return numpy.maximum(a, numpy.minimum(x, b))
 
 def norm(v):
-    mag = numpy.sqrt(sum([e * e for e in v]))
+    mag = numpy.sqrt(sum(e * e for e in v))
     return v / mag
 
 class Vec3:
@@ -26,7 +26,7 @@ class Vec3:
     def z(self):
         return self.v[2]
     def __repr__(self):
-        return "<Vec3 (%s,%s,%s)>" % tuple([repr(c) for c in self.v])
+        return "<Vec3 (%s,%s,%s)>" % tuple(repr(c) for c in self.v)
     def __add__(self, other):
         return Vec3(*[self.v[i] + other.v[i] for i in range(3)])
     def __sub__(self, other):
@@ -37,13 +37,13 @@ class Vec3:
         else:
             return Vec3(*[self.v[i] * other for i in range(3)])
     def mag2(self):
-        return sum([e * e for e in self.v])
+        return sum(e * e for e in self.v)
     def __abs__(self):
-        return numpy.sqrt(sum([e * e for e in self.v]))
+        return numpy.sqrt(sum(e * e for e in self.v))
     def norm(self):
         return self * (1.0 / abs(self))
     def dot(self, other):
-        return sum([self.v[i] * other.v[i] for i in range(3)])
+        return sum(self.v[i] * other.v[i] for i in range(3))
     def cross(self, other):
         (ax, ay, az) = self.v
         (bx, by, bz) = other.v
@@ -96,7 +96,7 @@ class Sphere:
         b = 2 * r.d.dot(v)
         c = self.center.mag2() + r.o.mag2() + -2 * self.center.dot(r.o) - (self.radius ** 2)
         det = (b * b) - (4 * c)
-        pred = 0 < det
+        pred = det > 0
 
         sq = numpy.sqrt(abs(det))
         h0 = (-b - sq) / (2)
@@ -125,7 +125,7 @@ class Plane:
         Vd = self.Pn.dot(r.d)
         V0 = -(self.Pn.dot(r.o) + self.D)
         h = V0 / Vd
-        pred = (0 <= h)
+        pred = h >= 0
 
         return (pred, numpy.where(pred, h, 999999.), self.Pn)
 
@@ -141,17 +141,13 @@ def texture(xy):
     xa = numpy.floor(x * 512)
     ya = numpy.floor(y * 512)
     a = (512 * ya) + xa
-    safe = (0 <= x) & (0 <= y) & (x < 1) & (y < 1)
-    if 0:
-        a = numpy.where(safe, a, 0).astype(numpy.int)
-        return numpy.where(safe, numpy.take(lena, a), 0.0)
-    else:
-        xi = numpy.floor(x * 11).astype(numpy.int)
-        yi = numpy.floor(y * 11).astype(numpy.int)
-        inside = (1 <= xi) & (xi < 10) & (2 <= yi) & (yi < 9)
-        checker = (xi & 1) ^ (yi & 1)
-        final = numpy.where(inside, checker, 1.0)
-        return numpy.where(safe, final, 0.5)
+    safe = (x >= 0) & (y >= 0) & (x < 1) & (y < 1)
+    xi = numpy.floor(x * 11).astype(numpy.int)
+    yi = numpy.floor(y * 11).astype(numpy.int)
+    inside = (xi >= 1) & (xi < 10) & (yi >= 2) & (yi < 9)
+    checker = (xi & 1) ^ (yi & 1)
+    final = numpy.where(inside, checker, 1.0)
+    return numpy.where(safe, final, 0.5)
 
 def under(vv, m):
     return Vec3(*(numpy.dot(m, vv.v + (1,))[:3]))
@@ -175,7 +171,7 @@ class Renderer:
             ny = (y + stoch_y - 0.5 - h2) / h2
             self.r[o] = cam.genray(nx, ny)
 
-        self.rnds = [random.random() for i in range(10)]
+        self.rnds = [random.random() for _ in range(10)]
 
     def frame(self, i):
 
@@ -254,10 +250,6 @@ cv.NamedWindow("snap")
 
 #images = [rend.frame(i) for i in range(0, 2000, 400)]
 images = [rend.frame(i) for i in [1200]]
-
-if 0:
-    for i,img in enumerate(images):
-        cv.SaveImage("final/%06d.png" % i, img)
 
 size = cv.GetSize(images[0])
 corners = [get_corners(i) for i in images]
